@@ -2,6 +2,7 @@ import { SVGContainer, TLShapeUtil } from '@tldraw/core';
 import * as React from 'react';
 import type { BoxShape } from './BoxShape';
 import carSvg from './CarSvg.svg'
+import personSvg from './person.svg'
 
 export const BoxComponent = TLShapeUtil.Component<BoxShape, SVGSVGElement>(
   ({ shape, events, isGhost, meta }, ref) => {
@@ -23,7 +24,10 @@ export const BoxComponent = TLShapeUtil.Component<BoxShape, SVGSVGElement>(
     };
 
     const handleClick = () => {
+      if (shape.label === 'car') {
+        // If shape label is 'car', set isEditing to true
         setIsEditing(true);
+      }
     };
 
     return (
@@ -41,6 +45,34 @@ export const BoxComponent = TLShapeUtil.Component<BoxShape, SVGSVGElement>(
             pointerEvents="all"
             onClick={handleClick}
           />
+          {shape.label === 'car' && (
+            <image
+              href={carSvg}
+              width={shape.size[0]}
+              height={shape.size[1]}
+              stroke={color}
+              strokeWidth={3}
+              strokeLinejoin="round"
+              fill="none"
+              rx={4}
+              opacity={isGhost ? 0.3 : 1}
+              pointerEvents="all"
+          />
+          )}
+          {shape.label === 'person' && (
+            <image
+              href={personSvg}
+              width={shape.size[0]}
+              height={shape.size[1]}
+              stroke={color}
+              strokeWidth={3}
+              strokeLinejoin="round"
+              fill="none"
+              rx={4}
+              opacity={isGhost ? 0.3 : 1}
+              pointerEvents="all"
+          />
+          )}
         </svg>
 
         {isEditing ? (
