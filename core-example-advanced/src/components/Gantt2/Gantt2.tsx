@@ -6,13 +6,14 @@ import './base.css'
 import './jquery-ui.min.css'
 import './style.css'
 
-const CELL_WIDTH = 180
+const CELL_WIDTH = 400
 // const MINUTES = 60
 const times = 60
 const stepSeconds = 60
 // const SIDE_TITLE = 2
 const SUBTITLE_WIDTH = 78
 let gloablStartHour = 0
+let totalMovementDuration = 21600
 
 interface listProps {
   driver: string
@@ -31,6 +32,7 @@ interface seriesProps {
 
 // time format
 function formatTime(date: Date | number = new Date()) {
+  console.log("formatting time")
   let initialDate = new Date(date)
   let year = initialDate.getFullYear()
   let month = initialDate.getMonth() //month(0-11, 0 is Jan)
@@ -41,24 +43,28 @@ function formatTime(date: Date | number = new Date()) {
   return { year, month, day, hours, minutes, seconds }
 }
 
+let interfaceStartTime = new Date().getTime() //Store the timestamp when the interface starts 
+
+function resetInterfaceStartTime() {
+  interfaceStartTime = new Date().getTime()
+}
+
 // generate time
 function genterateClock() {
-  let { hours: formatHours }: Record<string, string | number> = formatTime()
-  gloablStartHour = formatHours
-  formatHours = formatHours < 10 ? `0${formatHours}` : formatHours
-  const isDayEnd = formatHours == 24 ? 1 : 2
-  let startTime = new Date(`2022-10-20 ${formatHours}:00:00`).getTime()
-  let step = times * isDayEnd // generate current hour + next one hour. If current time is 24, only generate current hour.
-  let result = []
+  let elapsedTime = new Date().getTime() - interfaceStartTime; // Calculate elapsed time
+  let elapsedMinutes = elapsedTime / (1000 * 60); // Convert milliseconds to minutes
+  let step = times * 2; // Example: 2 hours of timeline
 
+  let result = [];
   for (let i = 0; i < step; i++) {
-    let cur = startTime + 60 * 1000 * i
-    let { hours, minutes }: Record<string, string | number> = formatTime(cur)
-    hours = hours < 10 ? `0${hours}` : hours
-    minutes = minutes < 10 ? `0${minutes}` : minutes
-    result.push(`${hours}:${minutes}`)
+    let minutes = Math.floor(elapsedMinutes + i * times); // Calculate minutes based on elapsed time
+    let hours = Math.floor(minutes / 60);
+    minutes %= 60;
+    hours %= 24;
+    let timeString = `${hours < 10 ? '0' : ''}${hours}:${minutes < 10 ? '0' : ''}${minutes}`;
+    result.push(timeString);
   }
-  return result
+  return result;
 }
 
 const timeSpan = genterateClock()
@@ -110,6 +116,7 @@ export default function Gantt2(props: GanttProps) {
               startTime: payload.startTime,
               endTime: payload.endTime,
               left: payload.left,
+              width: payload.width
             }
           } else if (seriesIndex > payload.startPosition && seriesIndex < payload.endPosition) {
             return {
@@ -151,6 +158,10 @@ export default function Gantt2(props: GanttProps) {
           ...v,
           series: v.series.map((item: seriesProps, index: number) => {
             let left = position.left - originalPosition.left
+          
+            let elapsedMinutes = Math.floor((position.left - originalPosition.left) / CELL_WIDTH)
+            let newTime = new Date(interfaceStartTime + elapsedMinutes * 60 * 1000).getTime()
+            
             const allCostSeconds = Math.trunc((left / CELL_WIDTH) * stepSeconds) // left/CELL_WIDTH the number of blocks between before dragging and after dragging。*stepSeconds total seconds
 
             const startTime = new Date(inlineData.startTime + allCostSeconds * 1000).getTime()
@@ -158,13 +169,22 @@ export default function Gantt2(props: GanttProps) {
             const endTime = new Date(inlineData.endTime + allCostSeconds * 1000).getTime()
 
             if (index === inlineIndex) {
+              const timeDiff = Math.abs(left / CELL_WIDTH) * totalMovementDuration;
+              // Adjust start and end times based on the time difference
+              const newStartTime = new Date(startTime - timeDiff).getTime();
+              const newEndTime = new Date(endTime - timeDiff).getTime();
               changedInlineData = {
                 ...item,
-                left: leftDistance || position.left,
-                startTime,
-                endTime,
-                time: new Date().toLocaleString(),
+                point: [newTime, item.point[1]],
+                left: position.left,
+                width: CELL_WIDTH,
+                driver: item.driver,
+                startTime: newStartTime,
+                endTime: newEndTime,
+                time: new Date(newTime).toLocaleString(),
+                
               }
+              
               return changedInlineData
             }
             return item
@@ -174,12 +194,63 @@ export default function Gantt2(props: GanttProps) {
         return v
       }
     })
+    result = result.map((v) => {
+      if (v.driver == inlineData.driver) {
+        let updatedSeries = v.series.slice()
+        updatedSeries.push(changedInlineData)
+        return { ...v, series: updatedSeries }
+      }
+      return v
 
-    // setData([...result])
+    })
+    setData([...result])
 
     // reset coordinates after dragging
-    resetPointsMapping(inlineData, inlineIndex, changedInlineData)
+    //resetPointsMapping(inlineData, inlineIndex, changedInlineData)
   }
+
+  // Function to handle button click and increase block width
+  const handleButtonClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    seriesIndex: number,
+    blockIndex: number
+  ) => {
+    event.stopPropagation(); // Prevent parent event from firing
+    const newDataList = dataList.map((item, dataIndex) => {
+      if (dataIndex === seriesIndex) {
+        // Increase block width by 5
+        return {
+          ...item,
+          series: item.series.map((v: seriesProps, index: number) => {
+            if (index === blockIndex) {
+              const increaseWidthBy = 5; // Increase width by 5 units
+              const newWidth = v.width + increaseWidthBy;
+  
+              // Calculate new start and end times based on the increased width
+              const increaseInSeconds = increaseWidthBy * stepSeconds;
+              
+              const newEndTime = v.endTime + increaseInSeconds * 1000;
+  
+              // Log the new mapping to the console
+            const newMapping = {
+              ...v,
+              width: newWidth,
+              endTime: newEndTime,
+              time: new Date(newEndTime).toLocaleString(),
+            };
+            console.log('New Mapping:', newMapping);
+
+            return newMapping;
+            }
+            return v;
+          }),
+        };
+      }
+      return item;
+    });
+    setData(newDataList);
+  
+};
 
   // initial graph
   function initCharts() {
@@ -341,9 +412,11 @@ export default function Gantt2(props: GanttProps) {
 
   function moveToView() {
     let { hours, minutes } = formatTime(new Date())
-
+    let currentTime = new Date().getTime()
+    let elapsedMinutes = (currentTime - interfaceStartTime) / (1000 * 60)
     const element = document.querySelector('.table')
-    let leftDistance = (hours - gloablStartHour) * 60 * CELL_WIDTH + CELL_WIDTH * minutes
+    let leftDistance = elapsedMinutes * CELL_WIDTH
+    //let leftDistance = (pointM - interfaceStartTime) / (1000 * 60) * CELL_WIDTH
 
     if (element) {
       element.scrollLeft = leftDistance
@@ -390,6 +463,7 @@ export default function Gantt2(props: GanttProps) {
             series: [{ ...span }],
             driver: v,
           })
+          console.log("Series:", series);
           curIndex = seriesIndex + 1
         }
       })
@@ -412,15 +486,16 @@ export default function Gantt2(props: GanttProps) {
         driver: point.driver,
         series: point.series.map((v: seriesProps) => {
           let { hours, minutes, seconds } = formatTime(v.startTime)
+          let elapsedTime = new Date().getTime() - interfaceStartTime
+          let elapsedMinutes = elapsedTime / (1000*60)
+          let customStartTimeDiff = elapsedMinutes
           return {
             ...v,
             driver: point.driver,
             left:
               v.left ||
               Math.trunc(
-                (hours - gloablStartHour) * 60 * CELL_WIDTH +
-                  CELL_WIDTH * minutes +
-                  (seconds / 60) * CELL_WIDTH
+                (v.startTime - interfaceStartTime) / (1000 * 60) * CELL_WIDTH
               ),
             width: v.width || Math.ceil(((v.endTime - v.startTime) / 1000 / 60) * CELL_WIDTH),
           }
@@ -474,7 +549,7 @@ export default function Gantt2(props: GanttProps) {
                   <div className="td">{index + 1}</div>
                   <Tooltip title={item.driver} key={index}>
                     <div className="td" title={item.driver}>
-                      {item.driver}
+                      {item.series[0].label}
                     </div>
                   </Tooltip>
                 </div>
@@ -490,10 +565,24 @@ export default function Gantt2(props: GanttProps) {
                         <div
                           key={seriesIndex}
                           data-block={JSON.stringify(v)}
-                          data-index={seriesIndex}
+                          data-index={v.label}
                           className="dragItem"
-                          style={{ left: `${v.left}px`, width: `${v.width}px` }}
+                          style={{ left: `${v.left}px`, width: `${v.width}px`, backgroundColor: item.series[0].color, overflow: 'auto', resize: 'horizontal', cursor: 'ew-resize'}}
                         >
+                        <button
+                          onClick={(e) => handleButtonClick(e, index, seriesIndex)}
+                            style={{
+                              position: 'absolute',
+                              top: '0',
+                              right: '0',
+                              padding: '5px 10px',
+                              backgroundColor: 'blue',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '2px',
+                              cursor: 'pointer'
+                            }}
+                            > </button>
                           {/* <div className="dragBox">{v.label}</div> */}
                         </div>
                       </Tooltip>

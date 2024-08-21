@@ -10,16 +10,21 @@ import {
   TLWheelEventHandler,
 } from '@tldraw/core'
 import { Bounds } from '@tldraw/core/src/components/Bounds'
-import { Button, Drawer } from 'antd'
+import { Button, Drawer, Upload } from 'antd'
 import * as React from 'react'
 import { Api } from 'state/api'
 import styled from 'stitches.config'
 import Gantt2 from './components/Gantt2/Gantt2'
 import { TitleLinks } from './components/TitleLinks'
 import { Toolbar } from './components/Toolbar'
-import { shapeUtils } from './shapes'
+import { shapeUtils, BoxShape } from './shapes'
 import { machine } from './state/machine'
 import './styles.css'
+import { Console } from 'console'
+import DisplayVid from 'video_display'
+import QueryPlayer from 'video_player'
+import {Plotly} from 'plotly'
+import { v4 as uuidv4 } from 'uuid';
 
 declare const window: Window & { api: Api }
 
@@ -31,6 +36,7 @@ type mappingProps = Record<
     startTime?: number
     endTime?: number
     break?: boolean
+    color?: string
   }[]
 >
 
@@ -51,7 +57,7 @@ function debounce(fn: (...args: any[]) => void, delay = 500) {
     if (time !== null) {
       clearTimeout(time)
     }
-
+    
     time = setTimeout(() => {
       fn(...args)
     }, delay)
@@ -224,10 +230,16 @@ interface AppProps {
 
 let pointMapping: any = {}
 
+const userDefinedShapes = [
+  { id: 'customID1', /* other shape properties */ },
+  { id: 'customID2', /* other shape properties */ },
+];
+
 export default function App({ onMount }: AppProps) {
   const appState = useStateDesigner(machine)
 
   const [dep, setDep] = React.useState([])
+  const [plotPoints, setPlotPoints] = React.useState([]);
 
   // const pointMapping = React.useRef<any>({})
 
@@ -237,17 +249,20 @@ export default function App({ onMount }: AppProps) {
       let endTime = new Date().getTime()
       pointMapping[item].push({
         point: state.page.shapes[item].point,
+        id: "box" + userDefinedShapes[0].id,
         time: new Date().toLocaleString(),
         startTime: startTime,
         endTime,
         break: true,
+        color: state.page.shapes[item].color,
+        label: state.page.shapes[item].label,
       })
     })
     setDep([])
   }
 
   const track = (state: any) => {
-    if (new Date().getTime() - prevTrackTime < 200) {
+    if (new Date().getTime() - prevTrackTime < 40) {
       return
     }
     state.pageState.selectedIds.forEach((item: string) => {
@@ -255,9 +270,12 @@ export default function App({ onMount }: AppProps) {
       let endTime = new Date().getTime()
       pointMapping[item].push({
         point: state.page.shapes[item].point,
+        id: "box",
         time: new Date().toLocaleString(),
         startTime: startTime,
         endTime,
+        color: state.page.shapes[item].color,
+        label: state.page.shapes[item].label,
       })
     })
     prevTrackTime = new Date().getTime()
@@ -304,28 +322,222 @@ export default function App({ onMount }: AppProps) {
     : false
 
   const [isModalOpen, setIsModalOpen] = React.useState(false)
+  const [isUploaderOpen, setIsUploaderOpen] = React.useState(false);
 
+  const showUploader = () => setIsUploaderOpen(true);
+  const closeUploader = () => setIsUploaderOpen(false);
   const showModal = () => setIsModalOpen(true)
-
   const onClose = () => setIsModalOpen(false)
+
+  
 
   const onChange = (val: mappingProps) => {
     pointMapping = { ...val }
+    console.log("Changed")
     setDep([])
   }
 
-  const onExport = () => {
-    let obj: map = {}
-    Object.keys(pointMapping).forEach((item: any) => {
-      obj[item] = pointMapping[item].filter((item: any) => !item.break)
-    })
-    // let map = pointMapping.filter((item:any) => !item.break)
-    let blob = new Blob([JSON.stringify(obj)]) //  create blob object
-    let link = document.createElement('a')
-    link.href = URL.createObjectURL(blob) //  create a URL object and send to href of 'a'
-    link.download = 'pointMapping.json' //  setting the name of the output file
-    link.click()
+  const print_pointMapping = () => {
+    console.log(pointMapping)
   }
+
+  function exportAndDownloadImage(data) {
+    const exportImage = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const padding = 120;
+  
+      // Add additional padding to the canvas dimensions
+      canvas.width = Math.max(document.documentElement.scrollWidth, window.innerWidth || 0) + padding * 2;
+      canvas.height = Math.max(document.documentElement.scrollHeight, window.innerHeight || 0) + padding * 2;
+  
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+      const legend = {};
+  
+      Object.keys(data).forEach((key, index) => {
+        const points = data[key];
+  
+        const x_coordinates = points.map((point) => point.point[0]);
+        const y_coordinates = points.map((point) => point.point[1]);
+  
+        const scaleX = (canvas.width - 2 * padding) / Math.max(...x_coordinates);
+        const scaleY = (canvas.height - 2 * padding) / Math.max(...y_coordinates);
+  
+        for (let i = 0; i < x_coordinates.length; i++) {
+          // Add padding to the calculated coordinates
+          const x = (x_coordinates[i] * scaleX) + padding;
+          const y = (y_coordinates[i] * scaleY) + padding;
+  
+          ctx.beginPath();
+          ctx.arc(x, y, 5, 0, 2 * Math.PI);
+          ctx.fillStyle = points[i].color;
+          ctx.fill();
+          ctx.closePath();
+  
+          if (!legend[points[i].color]) {
+            legend[points[i].color] = [];
+          }
+          if (!legend[points[i].color].includes(points[i].label)) {
+            legend[points[i].color].push(points[i].label);
+          }
+        }
+      });
+  
+      const legendX = 20;
+      const legendY = 20;
+      const legendSpacing = 20;
+  
+      Object.keys(legend).forEach((color, index) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(legendX, legendY + index * legendSpacing, 15, 15);
+        ctx.fillStyle = 'black';
+        ctx.fillText(`Object Label: ${legend[color].join(', ')}`, legendX + 20, legendY + 12 + index * legendSpacing);
+      });
+  
+      canvas.toBlob((blob) => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'pointMapping.png';
+        link.click();
+      });
+    };
+  
+    exportImage();
+  };
+  
+  const make_json_string = () => {
+    let obj: { [key: string]: any } = {}; 
+  
+    Object.keys(pointMapping).forEach((item) => {
+        // Check if obj[item] exists before logging it
+        if (obj[item] !== undefined) {
+            console.log(obj[item]);
+            console.log(typeof obj[item]);
+        }
+  
+        obj[item] = pointMapping[item].filter((point: any) => !point.break);
+    });
+    
+    console.log(JSON.stringify(obj))
+    return JSON.stringify(obj)
+  };
+
+  const onExport = () => {
+    // Ensure 'map' type is correct (it's probably an object, not a map)
+    let obj: { [key: string]: any } = {}; 
+  
+    Object.keys(pointMapping).forEach((item: any) => {
+      // Check if obj[item] exists before logging it
+      if (obj[item] !== undefined) {
+        console.log(obj[item]);
+        console.log(typeof obj[item]);
+      }
+  
+      obj[item] = pointMapping[item].filter((point: any) => !point.break);
+    });
+    
+    // download link 
+    let blob = new Blob([JSON.stringify(obj)], { type: 'application/json' });
+  
+    let link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'pointMapping.json';
+    document.body.appendChild(link); 
+    link.click();
+    document.body.removeChild(link); 
+
+    exportAndDownloadImage(obj)
+
+  };
+
+  const [isLoading, setIsLoading] = React.useState(false);
+  const runPythonFunction = async () => {
+    console.log("run query");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/run-py', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          'dataset': 'traffic',
+          'query_name': 'left_turn_tldraw1',
+          'model_checkpoint': 'data/model_checkpoint/model_cp.pt',
+          'json_data': make_json_string()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      console.log('Response data:', data);
+
+    } catch (error) {
+      console.error('Error occurred during fetch operation:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const runPy = async () => {
+    console.log("run query")
+    try {
+      const response = await fetch('http://127.0.0.1:5000/run-python', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      console.log('Response data:', data);
+
+    } catch (error) {
+      console.error('Error occurred during fetch operation:', error);
+    }
+  };
+
+
+  const generatePlotPoints = (data: any) => {
+    if (!data || !data.pageState || !data.page || !data.page.shapes) {
+      return null; // Return null if data is invalid or missing
+    }
+
+    const newPlotPoints: JSX.Element[] = []; //array for store elements
+
+    // point mapping
+    Object.keys(data.page.shapes).forEach((id) => {
+      const shape = data.page.shapes[id];
+      if (!shape || !shape.point) {
+        return; 
+      }
+      const [x, y] = shape.point; // get the x and y coordinates
+      const color = shape.color;
+      console.log(`POINT MAPPING for shape with ID: ${id}, x: ${x}, y: ${y}`);
+      // Create PlotPoint component and push to newPlotPoints array
+      newPlotPoints.push(
+        <PlotPoint key={uuidv4()} style={{ top: y, left: x - 4, background: color }} />
+      );
+    });
+
+    return newPlotPoints; // Return the array of new PlotPoint components
+  };
+
+  // Update plotPoints whenever appState changes
+  React.useEffect(() => {
+    const newPoints = generatePlotPoints(appState.data);
+    setPlotPoints((prevPoints) => [...prevPoints, ...newPoints]);
+  }, [appState]);
 
   return (
     <>
@@ -361,16 +573,49 @@ export default function App({ onMount }: AppProps) {
           hideResizeHandles={hideResizeHandles}
           hideIndicators={hideBounds}
           hideBindingHandles={true}
-        />
+          >
+            {appState.data.pageState.selectedIds.map((id: string) => {
+            const x = appState.data.page.shapes[id].point[0];
+            const y = appState.data.page.shapes[id].point[1];
+          })}
+          </Renderer>
+          {plotPoints}
         <Toolbar activeStates={appState.active} lastEvent={appState.log[0]} />
         <TitleLinks />
       </AppContainer>
+
       <TouchBarContainer className="touch-bar">
-        <Button type="primary" onClick={showModal}>
-          Trajectory Records
+        <Button type="primary" onClick={showUploader} style = {{marginRight: '10px', borderColor: 'black', background: 'black', color: 'white'}} >
+          Upload Dataset
         </Button>
+        <Button type="primary" onClick={showModal} style = {{marginRight: '10px', borderColor: 'black', background: 'black', color: 'white'}}>
+          Trajectory 
+        </Button>
+        <QueryPlayer/>
+        <Button type="primary" onClick={runPythonFunction} style = {{marginRight: '10px', borderColor: 'black', background: 'black', color: 'white'}}>
+          {isLoading ? 'Running...' : 'Run'}
+        </Button>
+        <DisplayVid/>
       </TouchBarContainer>
-      {/* antdesign component */}
+
+      <Drawer
+        title="Upload Dataset"
+        open={isUploaderOpen}
+        mask={false}
+        placement="bottom"
+        onClose={closeUploader}
+        height={400}
+      >
+        <Upload.Dragger>
+          <p className="ant-upload-drag-icon">
+          </p>
+          <p className="ant-upload-text">Click to Upload Dataset Here</p>
+          <p className="ant-upload-hint">
+            Supports Video Files
+          </p>
+        </Upload.Dragger>
+      </Drawer>
+      
       <Drawer
         title="Records"
         open={isModalOpen}
@@ -404,7 +649,8 @@ export default function App({ onMount }: AppProps) {
 }
 
 const AppContainer = styled('div', {
-  position: 'fixed',
+  position: 'absolute',
+  display: 'flex',
   top: '0px',
   left: '0px',
   right: '0px',
@@ -414,7 +660,9 @@ const AppContainer = styled('div', {
   zIndex: 101,
 })
 
-// Create the trajecory records pop-up on the right-bottom corner
+
+
+// Create the trajectory records pop-up on the right-bottom corner
 const TouchBarContainer = styled('div', {
   position: 'fixed',
   bottom: '60px',
@@ -428,4 +676,12 @@ const TextConatiner = styled('div', {
   justifyContent: 'center',
   marginTop: '30px',
   marginBottom: '30px',
+})
+
+const PlotPoint = styled('div', {
+  position: 'absolute',
+  width: '10px',
+  height: '10px',
+  borderRadius: '50%',
+  zIndex: 104,
 })

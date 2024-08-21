@@ -1,18 +1,42 @@
-import { TLBoundsCorner, TLPointerInfo } from '@tldraw/core'
-import { shapeUtils } from 'shapes'
-import type { Action } from 'state/constants'
-import { mutables } from 'state/mutables'
+import { TLBoundsCorner, TLPointerInfo } from '@tldraw/core';
+import { shapeUtils } from 'shapes';
+import type { Action } from 'state/constants';
+import { mutables } from 'state/mutables';
+
+
+const generateRandomColor = (): string => {
+  const randomHue = Math.floor(Math.random() * 360);
+  const randomColor = `hsl(${randomHue}, 70%, 50%)`;
+  return randomColor;
+};
+
+const getUserInput = (): string => {
+  const result = prompt('Label for Object:');
+  if (result === null) {
+    // Handle the case where user cancels or provides no input
+    return ''; // or some default value or logic
+  }
+  return result;
+};
+
+
 
 export const createBoxShape: Action = (data, payload: TLPointerInfo) => {
-  const shape = shapeUtils.box.getShape({
-    parentId: 'page1',
-    point: mutables.currentPoint,
-    size: [1, 1],
-    childIndex: Object.values(data.page.shapes).length,
-  })
+  const userInput = getUserInput();
 
-  data.page.shapes[shape.id] = shape
-  data.pageState.selectedIds = [shape.id]
+  if (userInput !== null) {
+    const shape = shapeUtils.box.getShape({
+      parentId: 'page1',
+      point: mutables.currentPoint,
+      size: [1, 1],
+      childIndex: Object.values(data.page.shapes).length,
+      color: generateRandomColor(),
+      label: userInput, 
+    });
 
-  mutables.pointedBoundsHandleId = TLBoundsCorner.BottomRight
-}
+    data.page.shapes[shape.id] = shape;
+    data.pageState.selectedIds = [shape.id];
+
+    mutables.pointedBoundsHandleId = TLBoundsCorner.BottomRight;
+  }
+};
