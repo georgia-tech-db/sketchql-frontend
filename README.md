@@ -9,7 +9,8 @@ Using a pre-trained model that encodes trajectory similarity, Sketch-QL achieves
 ## How to Run
 
 1. git clone https://github.com/tldraw/tldraw-v1.git
-2. replace the core-example-advanced folder with the folder from here 
+2. git clone this repository to get the sketch-ql-backend and core-example-advanced
+3. replace the core-example-advanced folder with the folder from here 
 
 ### Terminal window 1:
 
