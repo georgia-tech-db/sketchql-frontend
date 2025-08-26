@@ -33,12 +33,12 @@ cd tldraw-v1
 yarn install
 ```
 
-4. Start development server
+4. Start the application
 ```bash
 yarn start:core
 ```
 
-5. Open your browser and navigate to: `http://localhost:5421`
+5. Open your browser and navigate to: `http://localhost:5421`. If you are seeing a blank canvas on Chrome, try Safari instead. 
 
 
 ## 🎥 Demonstration Video
