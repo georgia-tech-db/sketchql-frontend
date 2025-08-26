@@ -1,50 +1,50 @@
-
 # SketchQL Demonstration
 
-## Description
+SketchQL is a video database management system for retrieving video moments with a sketch-based query interface.This interface allows users to specify object trajectory events with simple mouse drag-and-drop operations. Using a pre-trained model that encodes trajectory similarity, SketchQL achieves zero-shot video moments retrieval by performing similarity searches over the video to identify clips that are the most similar to the visual query.
 
-Sketch-QL is a video database management system for retrieving video moments with a sketch-based query interface.This interface allows users to specify object trajectory events with simple mouse drag-and-drop operations.
-Using a pre-trained model that encodes trajectory similarity, Sketch-QL achieves zero-shot video moments retrieval by performing similarity searches over the video to identify clips that are the most similar to the visual query. 
+## 🚀 How to Run
 
-## How to Run
+### Terminal Window 1: Backend Server
 
-1. git clone https://github.com/tldraw/tldraw-v1.git
-2. git clone this repository to get the sketch-ql-backend and core-example-advanced
-3. replace the core-example-advanced folder with the folder from here 
+1. First, set up the backend following the [SketchQL installation guide](https://github.com/georgia-tech-db/SketchQL?tab=readme-ov-file#%EF%B8%8F-installation).
 
-### Terminal window 1:
-
-1. cd sketchql-backend
-
-2. Install requirements\
-pip install -r requirements.txt
-
-Install ffmpeg
-MacOS: brew install ffmpeg
-
-4. Download dataset\
-Please download the traffic dataset from https://www.dropbox.com/scl/fi/qormqlzuijb8133um0wa7/VIRAT_S_050300_01_000148_000396.mp4?rlkey=if1vmf14md7nynjuepv9s903j&dl=0 and put it in the data/videos/ folder
-
-5. Download model checkpoint\
-Download from https://www.dropbox.com/scl/fi/5jnqj57idzhpm68sjyfb8/model_cp.pt?rlkey=sbz0ix15ofbz0x12d6714v5wu&dl=0 and put it in the data/model_checkpoint folder
-
-6. Run server\
-Run the script server.py\
+2. Start the backend server
+```bash
+# Navigate to SketchQL/
 python3 server.py
+```
 
-### Terminal window 2:
+### Terminal Window 2: Frontend Application
+1. Clone the `tldraw` repository. Please clone v1 (original version) instead of the new tldraw.
+```bash
+git clone https://github.com/tldraw/tldraw-v1.git
+```
 
-1. install yarn\
+2. Replace the `tldraw-v1/examples/core-example-advanced` folder with the `core-example-advanced` folder from this repository
+
+3. Install dependencies 
+
+```bash
+# Install yarn if not already installed
 npm install -g yarn
 
-2. Run code\
-cd tldraw-v1\
-yarn install\
-yarn start:core\
-open localhost://5421 in your browser
+# Navigate to project and install dependencies
+cd tldraw-v1
+yarn install
+```
+
+4. Start development server
+```bash
+yarn start:core
+```
+
+5. Open your browser and navigate to: `http://localhost:5421`
 
 
-## Video
-A video demonstrating how SketchQL works can be found in the video folder
+## 🎥 Demonstration Video
+A video demonstrating how SketchQL works can be found under the `video/` folder
 
 
+## 🔗 Related Resources
+- Backend Repository: [Georgia Tech DB SketchQL](https://github.com/georgia-tech-db/SketchQL)
+- tldraw Framework: [tldraw-v1 GitHub](https://github.com/tldraw/tldraw-v1)
